@@ -7,5 +7,5 @@ config = {
     "file_dir" : "response_files\\",
     "max_threads" : 5,
     "sleep_time" : 5,
-    "max_links" : 200
+    "max_links" : 5000
 }
