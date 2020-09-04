@@ -1,12 +1,55 @@
 import random
 import string
+import requests
+from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
+from cfg import config
+
+
+def previous_day():
+    return datetime.now() - timedelta(hours = 24)
+
+def extract_links(links_collection, r, link, url):
+    parsed_html = BeautifulSoup(r.content, "html.parser")
+
+    # Save all valid links to database
+    for a in parsed_html.find_all('a', href = True):
+
+        # First check if database size is already at max_links
+        if links_collection.count_documents({}) >= config['max_links']:
+            # Do not add any new links to database, simply break
+            break
+
+        # Check for relative links
+        if a['href'] == "" or a['href'][0] == '//':
+            continue
+
+        if a['href'][0] == '/':
+            a['href'] = requests.compat.urljoin(link['sourceLink'], a['href'])
+            
+        if not (requests.compat.urlparse(a['href']).scheme and requests.compat.urlparse(a['href']).netloc):
+            continue
+
+        # Add new entry to database only if link is unique
+        if links_collection.count_documents({"link" : a['href']}) == 0:
+            links_collection.insert_one({
+                "link" : a['href'], 
+                "sourceLink" : url, 
+                "isCrawled" : False, 
+                "lastCrawlDt" : None, 
+                "responseStatus" : None, 
+                "contentType" : None, 
+                "contentLength" : None, 
+                "filePath" : None, 
+                "createdAt" : datetime.now()
+            })
 
 def save_file(response_bytes, filepath):
     with open(filepath, 'wb') as f:
         f.write(response_bytes)
 
-def mark_link_crawled(collection, link, lastCrawlDt, status_code, content_type, content_length, file_path):
-    collection.update_one({"link" : link},{"$set":{
+def mark_link_crawled(links_collection, link, lastCrawlDt, status_code, content_type, content_length, file_path):
+    links_collection.update_one({"link" : link},{"$set":{
                 "isCrawled" : True,
                 "lastCrawlDt" : lastCrawlDt,
                 "responseStatus" : status_code,
